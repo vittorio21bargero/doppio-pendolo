@@ -47,20 +47,6 @@ equilibrium.
 
 ![Lyapunov exponent along the diagonal](figures/lyapunov_vs_theta.png)
 
-## How to run
-
-Requirements: a C++17 compiler with OpenMP (tested with g++ 13), Python 3 with NumPy and Matplotlib.
-
-```bash
-make                                # builds ./double_pendulum
-./double_pendulum energy            # or: convergence | lyapunov | grids | all
-python scripts/plot_results.py      # reads data/, writes figures/
-```
-
-Each experiment writes plain-text tables to `data/` (not tracked by git). Running times on a laptop:
-`convergence` and `lyapunov` take a few seconds, `energy` about 40 s, `grids` (2 × 10⁴ initial
-conditions, parallelised with OpenMP) a few minutes.
-
 ## Repository structure
 
 ```
@@ -78,6 +64,13 @@ conditions, parallelised with OpenMP) a few minutes.
 ├── figures/              figures used in this README
 └── Makefile
 ```
+
+## Reproducibility
+
+- **Requirements:** a C++17 compiler with OpenMP (tested with g++ 13); Python 3 with NumPy and Matplotlib for the figures.
+- **Run:** `make`, then `./double_pendulum all` (or one of `energy`, `convergence`, `lyapunov`, `grids`)
+  and `python scripts/plot_results.py`. Everything runs in a few minutes on a laptop.
+- **Data:** none needed; the simulations write their output tables to `data/`.
 
 ## Author
 
