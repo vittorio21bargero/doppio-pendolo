@@ -1,17 +1,23 @@
 #ifndef INTEGRATORS_H
 #define INTEGRATORS_H
 #include <string>
+#include <vector>
 
 using namespace std;
 
-struct Method { // struct mi permette di associare il nome del metodo al metodo vero e proprio
+// one integration step: advances Y (neq components) by h, using the right-hand side RHSFunc
+typedef void (*StepFunc)(double t, double *Y, void(*RHSFunc)(double*, double*), double h, int neq);
+
+struct Method { // pairs the name of a method with the method itself
     string name;
-    void(*func)(double, double*, void(*)(double*, double*), double, int);
+    StepFunc func;
 };
+
 void EulerStep(double t, double *Y, void(*RHSFunc)(double*, double*), double dt, int neq);
 void RK2Step(double t, double *Y, void(*RHSFunc)(double*, double*), double h, int neq);
 void RK4Step(double t, double *Y, void(*RHSFunc)(double*, double*), double h, int neq);
 void position_verlet(double t, double *Y, void(*RHSFunc)(double*, double*), double h, int neq);
 
-#endif
+extern vector<Method> methods; // Euler, RK2, RK4, Verlet
 
+#endif

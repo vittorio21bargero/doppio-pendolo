@@ -1,12 +1,10 @@
 #include "energy.h"
-#include "integrators.h"
-#include "simulate.h"
 #include <cmath>
 
 double E_0=25;
 
 double E(double* Y) {
-    // energia meccanica del doppio pendolo
+    // mechanical energy of the double pendulum (potential = 0 with both arms hanging down)
 
     double L1=1, L2=1, m1=1, m2=1, g=9.81;
     double V = (m1+m2)*g*L1*(1 - cos(Y[0])) + m2*g*L2*(1 - cos(Y[2]));
@@ -15,9 +13,7 @@ double E(double* Y) {
 }
 
 double E_err(double* Y){
-    // errore relativo sull'energia
+    // relative energy error
 
-    return abs((E(Y)-E_0)/E_0);
-
-
+    return fabs((E(Y)-E_0)/E_0);
 }

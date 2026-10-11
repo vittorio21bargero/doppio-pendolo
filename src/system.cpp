@@ -24,8 +24,9 @@ void dYdt_linearized(double *Y, double *R) {
 }
 
 
-// --- soluzione teorica linearizzata (m1=m2, L1=L2=L) ---
-double theta1_theorical(double t, double theta0, double g, double L){
+// --- exact solution of the linearized system (m1=m2, L1=L2=L), theta1(0)=theta2(0)=theta0, at rest ---
+// superposition of the two normal modes w_+ and w_-
+double theta1_theoretical(double t, double theta0, double g, double L){
     double w_plus  = sqrt((g/L)*(2.0 + sqrt(2.0)));
     double w_minus = sqrt((g/L)*(2.0 - sqrt(2.0)));
     double c_plus  = 1.0 - 1.0/sqrt(2.0);

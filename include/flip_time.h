@@ -1,14 +1,7 @@
 #ifndef FLIP_TIME_H
 #define FLIP_TIME_H
-#include "integrators.h"
-#include "system.h"
-#include <fstream>
 
-
-
-void RK4Step (double t, double *Y, void(*RHSFunc)(double*, double*), double h, int neq);
-double flip_time(double* Y,int neq);
-int flip_number(double* Y,int neq);
+double flip_time(double* Y, int neq);  // first time the second arm flips over (-1 if not within T=10)
+int flip_number(double* Y, int neq);   // number of flips of the second arm within T=50
 
 #endif
-

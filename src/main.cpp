@@ -1,204 +1,167 @@
+// Double pendulum: comparison of integrators and characterisation of chaos.
+//
+// Usage:  ./double_pendulum [experiment]
+//   energy       relative energy error vs time, for each method and time step
+//   convergence  global error vs step size on the linearized system (exact solution known)
+//   lyapunov     largest Lyapunov exponent, FTLE and flip time vs the initial angle
+//   grids        flip number and Lyapunov exponent on a 100x100 grid of initial conditions
+//   all          everything above (default)
+// Results are written as text files in data/; scripts/plot_results.py turns them into figures.
+
 #include <iostream>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <vector>
 #include <string>
+#include <filesystem>
 #include "integrators.h"
 #include "system.h"
 #include "energy.h"
 #include "simulate.h"
 #include "lyapunov.h"
 #include "flip_time.h"
-#include <filesystem>
 
 using namespace std;
 
+const int neq = 4;
 
 
+// ENERGY ERROR vs t, for the 4 methods and dt = 1e-2 ... 1e-6
+// initial condition: both arms horizontal, at rest
+void energy_experiment() {
 
-
-int main() {
-
-    vector<Method> methods = {
-    {"Euler",  EulerStep},
-    {"RK2",    RK2Step},
-    {"RK4",    RK4Step},
-    {"Verlet", position_verlet}
-};
-    const int neq = 4;
+    filesystem::create_directories("data/energy");
     double Y[neq];
-
     double tmax = 10.0;
 
-
-    //ENERGY_ERROR(t,dt) per i 4 metodi
-
-    //energia iniziale
-    init_conditions(Y, 0.5*M_PI, 0, 0.5*M_PI, 0);
-    E_0 = E(Y);
-
-
     for (int i = 2; i <= 6; i++) {
-
         double dt = pow(10.0, -i);
-        int N = static_cast<int>(tmax / dt); //esplicito conversione double ---> int
+        int N = static_cast<int>(round(tmax / dt));
 
-        string filename = "data/error(dt)/dati_dt_" + to_string(i) + ".txt"; // mi serve string type per concatenare il tutto
-        ofstream angles_energy_file(filename); //apre direttamente il file senza bisogno di fdata.open()
-        angles_energy_file << "#        dt = " << dt << endl<<endl;
-
-        // ciclo sui metodi di integrazione
-        for (size_t j = 0; j < methods.size(); ++j) {
-
-            Method& m = methods[j];
-
-
-            // header utile per gnuplot---> togliere
-            angles_energy_file<<endl;
-            angles_energy_file << "#        Metodo: " << m.name << endl<<endl;
-
-            angles_energy_file<< "#       t     theta1     theta2       E          dE" << endl;
-            angles_energy_file << endl;
+        for (const Method& m : methods) {
+            ofstream out("data/energy/" + m.name + "_dt_1e-" + to_string(i) + ".txt");
+            out << "# method: " << m.name << "   dt = " << dt << endl;
+            out << "#      t         theta1         theta2              E             dE         dE_cum" << endl;
 
             init_conditions(Y, 0.5*M_PI, 0.0, 0.5*M_PI, 0.0);
-            integrate(Y, neq, tmax, N, m.func,writeData1, angles_energy_file);
+            E_0 = E(Y);
+            integrate(Y, neq, tmax, N, m.func, writeEnergy, out);
+        }
+        cout << "energy: dt = " << dt << " done" << endl;
     }
 
-    angles_energy_file.close();
+    // ENERGY ERROR vs t for increasing amplitude theta1 = theta2 = pi*i/M, RK4, dt = 1e-5
+    int M = 6;
+    for (int i = 1; i < M; i++) {
+        ofstream out("data/energy/RK4_amplitude_" + to_string(i) + "of" + to_string(M) + ".txt");
+        double theta = M_PI*(static_cast<double>(i)/M);
+        out << "# RK4, dt = 1e-5, theta1 = theta2 = " << theta << endl;
+        init_conditions(Y, theta, 0, theta, 0);
+        E_0 = E(Y);
+        integrate(Y, neq, tmax, 1000000, RK4Step, writeEnergy, out);
+    }
+    cout << "energy: amplitude scan done" << endl;
 }
 
 
+// CONVERGENCE STUDY: on the linearized system theta1(t) is known exactly,
+// so the global error at t = 10 can be measured as a function of h = 2^-n
+void convergence_experiment() {
 
-
-
-
-
-   //ENERGY_ERROR(t,condizione iniziale) , dt=10^-4  , metodo = RK4
-
-   int M=6;
-   for(int i=1;i<M;i++){
-
-        string filename = "data/ENERGY/ENERGY_init_cond/ENERGY_init_cond_dt_-3_tmax_1000_" + to_string(i) + ".txt"; // mi serve string type per concatenare il tutto
-        ofstream angles_energy_file_2(filename); //apre direttamente il file senza bisogno di fdata.open()
-        init_conditions(Y,M_PI*(static_cast<double>(i)/M),0,M_PI*(static_cast<double>(i)/M),0);
-        E_0=E(Y);
-        integrate(Y,neq,tmax,1e6,RK4Step,writeData1,angles_energy_file_2);
-    }*/
-
-
-
-
-
-    //ENERGY_ERROR(t,condizione_iniziale)
-
-
-
-
-
-    //LYAPUNOV +FLIP TIME
-    init_conditions(Y,M_PI/2,0,M_PI/2,0);
-    compute_grid("data/lyapunov.txt", ftle);
-    init_conditions(Y,M_PI/2,0,M_PI/2,0);
-    compute_grid("data/fliptime.txt", flip_time);*/
-
-
-
-
-int Nstep = 100;                 // numero di condizioni iniziali tra 0 e pi
-
-
-
-ofstream out("data/LYAPUNOV/lyapunov_theta_tmax_10.txt");
-
-
-out << "# theta   FTLE   Lyapunov_max\n";
-
-for(int j=0; j<=Nstep; j++){
-    double theta = M_PI * (static_cast<double>(j)/Nstep);   // condizione iniziale simmetrica
-
-    // --- FTLE
-    init_conditions(Y, theta, 0, theta, 0);
-    double lambda_ftle = ftle(Y, neq);
-
-    // --- Lyapunov (Benettin)
-    init_conditions(Y, theta, 0, theta, 0);
-    double lambda_max = lyapunov_max_benettin(Y, neq);
-
-    // --- flip time
-    init_conditions(Y, theta, 0, theta, 0);
-    double t_flip = flip_time(Y, neq);
-
-    out << theta << "   " << lambda_ftle << "   "
-        << lambda_max << "   " << t_flip << "\n";
-
-    cout << "theta = " << theta
-         //<< "  FTLE = " << lambda_ftle
-         //<< "  lyap = " << lambda_max << endl;   // per seguire l'avanzamento
-}
-out.close();*/
-
-
-
-
-
-// STUDIO DI CONVERGENZA
-
-
-
-    ofstream out("data/ERROR_CONVERGENCE/error_convergence.txt");
+    filesystem::create_directories("data/convergence");
 
     double tmax = 10;
-    double g  = 9.81;
+    double g = 9.81;
     double L = 1;
     double theta0 = 1e-1;
-    double theta1_exact = theta1_theorical(tmax, theta0, g, L);
+    double theta1_exact = theta1_theoretical(tmax, theta0, g, L);
 
+    ofstream nullfile; // unused stream for the empty callback
 
-    ofstream nullfile; // stream inutilizzato per il callback vuoto
+    for (const Method& m : methods) {
+        ofstream out("data/convergence/" + m.name + ".txt");
+        out << "# method: " << m.name << endl;
+        out << "#           h      theta1_num    theta1_exact       abs_error" << endl;
 
-
-
-    // ciclo sui metodi di integrazione
-    for(size_t j = 0; j < methods.size(); ++j){
-        out << "# metodo: " << methods[j].name << "\n";
-        out << "# h    theta1_exp    theta1_teo    errore_abs\n";
-
-        // ciclo sugli step di integrazione dt
-        for(int n = 2; n <= 20; ++n){
+        for (int n = 2; n <= 20; ++n) {
             double h = pow(2.0, -n);
-            int N = static_cast<int>(round(tmax / h)); // numero di passi
+            int N = static_cast<int>(round(tmax / h));
 
-            // condizioni iniziali: theta1=theta2=theta0, velocita nulle
-            double Y[4];
+            double Y[neq];
+            init_conditions(Y, theta0, 0.0, theta0, 0.0);
+            integrate_linearized(Y, neq, tmax, N, m.func, dummyCallback, nullfile);
 
-            init_conditions(Y, theta0, 0.0, theta0, 0.0); // adatta all'ordine del TUO stato!
-
-            // integrazione fino a tmax, senza scrivere nulla durante il moto
-            integrate_linearized(Y, neq, tmax, N, methods[j].func , dummyCallback, nullfile);
-
-            double theta1_num = Y[0];  // <-- theta1 finale: adatta l'indice se serve
-            double err = fabs(theta1_num - theta1_exact);
-
-            out << h << "   " << theta1_num << "   "
-                << theta1_exact << "   " << err << "\n";
+            double err = fabs(Y[0] - theta1_exact);
+            out << setprecision(10) << setw(16) << h << setw(16) << Y[0]
+                << setw(16) << theta1_exact << setw(16) << err << endl;
         }
-        out << "\n\n"; // due righe vuote = nuovo blocco index per gnuplot
+        cout << "convergence: " << m.name << " done" << endl;
     }
-    out.close();*/
+}
 
 
+// LYAPUNOV EXPONENT, FTLE and FLIP TIME along the diagonal theta1 = theta2 = theta in [0, pi]
+void lyapunov_experiment() {
 
-// NUMERO DI FLIP (T = 50)
+    filesystem::create_directories("data/lyapunov");
+
+    const int Nstep = 100;
+    vector<double> lam_ftle(Nstep+1), lam_max(Nstep+1), t_flip(Nstep+1);
+
+    #pragma omp parallel for schedule(dynamic)
+    for (int j = 0; j <= Nstep; j++) {
+        double theta = M_PI * (static_cast<double>(j)/Nstep);
+        double Y[neq];
+
+        init_conditions(Y, theta, 0, theta, 0);
+        lam_ftle[j] = ftle(Y, neq);
+
+        init_conditions(Y, theta, 0, theta, 0);
+        lam_max[j] = lyapunov_max_benettin(Y, neq);
+
+        init_conditions(Y, theta, 0, theta, 0);
+        t_flip[j] = flip_time(Y, neq);
+    }
+
+    ofstream out("data/lyapunov/lyapunov_vs_theta.txt");
+    out << "#   theta          FTLE    lambda_max     flip_time" << endl;
+    for (int j = 0; j <= Nstep; j++)
+        out << setw(10) << M_PI*(static_cast<double>(j)/Nstep) << setw(14) << lam_ftle[j]
+            << setw(14) << lam_max[j] << setw(14) << t_flip[j] << endl;
+    cout << "lyapunov: done" << endl;
+}
 
 
-compute_grid("data/LYAPUNOV_FLIPTIME/fliptime_grid.txt", flip_number);
+double flip_number_d(double* Y, int neq) { return flip_number(Y, neq); } // adapter for compute_grid
+
+// MAPS over the plane of initial angles (theta1, theta2), both arms at rest
+void grids_experiment() {
+
+    filesystem::create_directories("data/grids");
+
+    compute_grid("data/grids/flip_number.txt", flip_number_d);         // T = 50
+    cout << "grids: flip number done" << endl;
+
+    compute_grid("data/grids/lyapunov.txt", lyapunov_max_benettin);   // T = 10, Benettin
+    cout << "grids: lyapunov done" << endl;
+}
 
 
-// LYAPUNOV (T=10,benettin)
+int main(int argc, char** argv) {
 
-compute_grid("data/LYAPUNOV_FLIPTIME/lyapunov_grid.txt", lyapunov_max_benettin);
+    string which = (argc > 1) ? argv[1] : "all";
 
+    if (which == "energy"      || which == "all") energy_experiment();
+    if (which == "convergence" || which == "all") convergence_experiment();
+    if (which == "lyapunov"    || which == "all") lyapunov_experiment();
+    if (which == "grids"       || which == "all") grids_experiment();
 
-return 0;
+    if (which != "energy" && which != "convergence" && which != "lyapunov" &&
+        which != "grids" && which != "all") {
+        cerr << "unknown experiment '" << which
+             << "'. Use: energy | convergence | lyapunov | grids | all" << endl;
+        return 1;
+    }
+    return 0;
 }

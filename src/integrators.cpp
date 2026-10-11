@@ -1,54 +1,50 @@
 #include "integrators.h"
-#include "system.h"  // serve per usare RHSFunc
+#include "system.h"
 #include <cmath>
 #include <string>
 #include <vector>
 
 using namespace std;
 
-// definisco i metodi di integrazione
-vector<Method> methods = { // gli scruct sono dei tipi quindi al posto di int ... qui avro method
-    {"Euler", EulerStep},
-    {"RK2", RK2Step},
-    {"RK4", RK4Step},
+// the integration methods compared in the project
+vector<Method> methods = {
+    {"Euler",  EulerStep},
+    {"RK2",    RK2Step},
+    {"RK4",    RK4Step},
     {"Verlet", position_verlet}
-    };
+};
 
+// EULER (first order)
 
 void EulerStep(double t, double *Y, void(*RHSFunc)( double*, double*), double dt, int neq) {
     double rhs[4];
     RHSFunc( Y, rhs);
 
     for (int k = 0; k < neq; k++) {
-        Y[k] += dt * rhs[k]; //per ogni componente ad ogni passo temporale la y varia come il rhs (metodo al primo ordine)
+        Y[k] += dt * rhs[k]; // each component moves along the right-hand side evaluated at the start of the step
     }
 }
 
-//RUNGE-KUTTA 2
+// RUNGE-KUTTA 2 (midpoint)
 
 void RK2Step (double t, double *Y, void(*RHSFunc)( double*, double*), double h, int neq){
 
     double Y1[neq], k1[neq], k2[neq];
 
-    RHSFunc(Y,k1); //  k1=R quindi posso direttamente prenderlo dalla funzione
+    RHSFunc(Y,k1);
 
     int i;
 
     for (i=0;i<neq;i++){
-        Y1[i]= Y[i]+0.5*h*k1[i];}
+        Y1[i]= Y[i]+0.5*h*k1[i];}   // half step to the midpoint
 
-    RHSFunc(Y1,k2); // da capire un po meglio
+    RHSFunc(Y1,k2);                 // slope at the midpoint
 
     for (i=0;i<neq;i++){
         Y[i]+=h*k2[i];}
-
-
-
 }
 
-
-
-//RUNGE-KUTTA 4
+// RUNGE-KUTTA 4
 
 void RK4Step (double t, double *Y, void(*RHSFunc)(double*, double*), double h, int neq){
 
@@ -70,26 +66,26 @@ void RK4Step (double t, double *Y, void(*RHSFunc)(double*, double*), double h, i
     RHSFunc(Y3,k4);
     for (i=0;i<neq;i++){
         Y[i]+=h/6*(k1[i]+2*k2[i]+2*k3[i]+k4[i]);}
-
 }
 
-//POSITION VERLET
+// POSITION VERLET (drift - kick - drift)
+// note: for the double pendulum the accelerations also depend on the velocities,
+// so the scheme is not exactly symplectic here
 
 void position_verlet(double t, double *Y, void(*RHSFunc)(double*, double*), double h, int neq){
 
     int i;
     double R[neq];
 
-    // calcolo le posizioni a t=h/2
-    for (i=0; i<neq; i+=2) //i+=2 per skippare le velocita
+    // positions at t + h/2
+    for (i=0; i<neq; i+=2) // i+=2 skips the velocities
         Y[i] += 0.5*h*Y[i+1];
 
-    // calcolo le accelerazioni R(x=x(t=h/2)) di cui poi mi servira solo R[1]
+    // accelerations evaluated at the midpoint positions (only R[1], R[3] are used)
     RHSFunc(Y,R);
 
-    // calcolo velocita e poi posizioni
+    // full velocity step, then second half of the position step
     for (i=0; i<neq; i+=2) {
         Y[i+1] += h*R[i+1];
         Y[i]   += 0.5*h*Y[i+1];}
-
-    }
+}

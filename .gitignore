@@ -20,3 +20,6 @@ VARIE/
 # Eseguibili compilati
 *.exe
 build/
+
+# compiled binary
+double_pendulum

@@ -1,25 +1,24 @@
+#include "flip_time.h"
 #include "integrators.h"
 #include "system.h"
-#include <iomanip>
-#include <fstream>
 #include <cmath>
 
 using namespace std;
 
 double flip_time(double* Y, int neq) {
 
-    const double dt = 1e-4;      // passo ottimale
-    const double T  = 10.0;      // tmax
+    const double dt = 1e-4;      // step chosen from the convergence study
+    const double T  = 10.0;      // maximum time
     double t = 0.0;
 
     while(t < T){
-        RK4Step(t, Y, dYdt, dt, neq);   // RK4 (metodo migliore)
+        RK4Step(t, Y, dYdt, dt, neq);   // RK4: the most accurate of the four methods
         t += dt;
-        if(fabs(Y[2]) > M_PI){     // condizione di flip
+        if(fabs(Y[2]) > M_PI){         // flip condition: the second arm goes over the top
             return t;
         }
     }
-    return -1.0;   // nessun flip entro T
+    return -1.0;   // no flip within T
 }
 
 
@@ -30,14 +29,13 @@ int flip_number(double* Y, int neq) {
     double t = 0.0;
     int flips = 0;
 
-    // devo creare fascie di 2pi (traslando di pi) per rimanere in mod 2pi
+    // bands of width 2pi centred on 0, 2pi, 4pi, ...: crossing into a new band is a flip
     int k_prev = (int)floor((Y[2] - M_PI) / (2.0*M_PI));
 
     while (t < T) {
         RK4Step(t, Y, dYdt, dt, neq);
         t += dt;
 
-        // se mi trovo in una fascia diversa da prima allora il pendolo ha flippato
         int k_curr = (int)floor((Y[2] - M_PI) / (2.0*M_PI));
         if (k_curr != k_prev) {
             flips += 1;
