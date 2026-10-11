@@ -16,3 +16,7 @@ VARIE/
 
 
 
+
+# Eseguibili compilati
+*.exe
+build/
