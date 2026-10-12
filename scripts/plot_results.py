@@ -14,6 +14,7 @@ FIG.mkdir(exist_ok=True)
 
 METHODS = ["Euler", "RK2", "RK4", "Verlet"]
 COLORS = {"Euler": "#d62728", "RK2": "#ff7f0e", "RK4": "#1f77b4", "Verlet": "#2ca02c"}
+H_COLORS = {2: "#d62728", 3: "#ff7f0e", 4: "#e6b800", 5: "#2ca02c", 6: "#1f77b4"}  # h = 10^-i
 
 plt.rcParams.update({"font.size": 11, "axes.spines.top": False, "axes.spines.right": False})
 
@@ -27,23 +28,18 @@ def load_grid(path):
 
 
 def energy():
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4))
-
-    for m in METHODS:
-        t, _, _, _, dE, _ = np.loadtxt(DATA / "energy" / f"{m}_dt_1e-3.txt", unpack=True)
-        ax1.semilogy(t[1:], dE[1:], color=COLORS[m], label=m)
-    ax1.set(xlabel="t [s]", ylabel=r"$|E(t)-E_0|/E_0$",
-            title=r"Energy error, $\Delta t=10^{-3}$, $\theta_1=\theta_2=\pi/2$")
-    ax1.legend(frameon=False, ncol=4, loc="upper center", bbox_to_anchor=(0.5, -0.18))
-
-    dts = [10.0**-i for i in range(2, 7)]
-    for m in METHODS:
-        max_err = [np.loadtxt(DATA / "energy" / f"{m}_dt_1e-{i}.txt")[:, 4].max() for i in range(2, 7)]
-        ax2.loglog(dts, max_err, "o-", color=COLORS[m], label=m)
-    ax2.set(xlabel=r"$\Delta t$", ylabel=r"max relative energy error over $t\in[0,10]$",
-            title="Energy error vs time step")
-    ax2.legend(frameon=False)
-
+    """Cumulative relative energy error xi_cum(t) for each method and time step h."""
+    fig, axes = plt.subplots(2, 2, figsize=(11, 8), sharex=True)
+    for ax, m in zip(axes.flat, METHODS):
+        for i, c in H_COLORS.items():
+            t, *_, err_cum = np.loadtxt(DATA / "energy" / f"{m}_dt_1e-{i}.txt", unpack=True)
+            ax.semilogy(t[1:], err_cum[1:], ".", ms=3, color=c, label=rf"$h=10^{{-{i}}}$")
+        ax.set_title(m if m != "Verlet" else "Position Verlet")
+        ax.set_ylabel(r"$\xi_{cum}(t)$")
+    for ax in axes[1]:
+        ax.set_xlabel("t [s]")
+    axes[0, 0].legend(frameon=False, fontsize=9, markerscale=3)
+    fig.suptitle(r"Cumulative energy error, $\theta_1=\theta_2=\pi/2$ at rest")
     fig.tight_layout()
     fig.savefig(FIG / "energy_error.png", dpi=150)
     plt.close(fig)
@@ -74,41 +70,41 @@ def convergence():
 
 
 def lyapunov():
-    theta, ftle, lam, tflip = np.loadtxt(DATA / "lyapunov" / "lyapunov_vs_theta.txt", unpack=True)
-    fig, ax = plt.subplots(figsize=(7, 4.2))
-    ax.plot(theta, lam, "o-", ms=3, color="#1f77b4", label=r"$\lambda_{max}$ (Benettin)")
-    ax.plot(theta, ftle, "s", ms=3, color="#7f7f7f", alpha=0.7, label="FTLE (single run, T=10)")
-    ax.set(xlabel=r"initial angle $\theta_1=\theta_2=\theta$ [rad]", ylabel=r"Lyapunov exponent [s$^{-1}$]",
-           title="Onset of chaos along the diagonal of initial conditions")
-    ax.set_xticks([0, np.pi / 4, np.pi / 2, 3 * np.pi / 4, np.pi],
-                  ["0", r"$\pi/4$", r"$\pi/2$", r"$3\pi/4$", r"$\pi$"])
-    ax.axhline(0, color="k", lw=0.5)
-    ax.legend(frameon=False, loc="upper left")
+    """Largest Lyapunov exponent and first flip time along the symmetric initial condition."""
+    theta, _, lam, tflip = np.loadtxt(DATA / "lyapunov" / "lyapunov_vs_theta.txt", unpack=True)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4))
+    ax1.plot(theta, lam, "o-", ms=3, lw=1, color="#1f77b4")
+    ax1.axhline(0, color="k", lw=0.5)
+    ax1.set(ylabel=r"$\lambda_{max}$ [s$^{-1}$]", title="Largest Lyapunov exponent")
+    flipped = tflip > 0  # -1 = no flip within 10 s
+    ax2.plot(theta[flipped], tflip[flipped], "o", ms=3.5, color="#d62728")
+    ax2.set(ylabel="time of first flip [s]", title="Flip time", ylim=(0, 10))
+    for ax in (ax1, ax2):
+        ax.set_xlabel(r"$\theta_0$  (initial condition $\theta_1=\theta_2=\theta_0$, at rest)")
+        ax.set_xlim(0, np.pi * 1.02)
     fig.tight_layout()
     fig.savefig(FIG / "lyapunov_vs_theta.png", dpi=150)
     plt.close(fig)
 
 
 def maps():
+    """Largest Lyapunov exponent and number of flips on a grid of initial conditions."""
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.6))
     ticks = [0, np.pi / 2, np.pi]
     labels = ["0", r"$\pi/2$", r"$\pi$"]
 
-    th1, th2, flips = load_grid(DATA / "grids" / "flip_number.txt")
-    im = axes[0].pcolormesh(th2, th1, flips, cmap="magma", shading="auto")
-    fig.colorbar(im, ax=axes[0], label="number of flips of the 2nd arm in 50 s")
-    # energy bound: starting at rest, the 2nd arm can reach theta2 = pi only if 2cos(th1) + cos(th2) <= 1
-    T2, T1 = np.meshgrid(np.linspace(0, np.pi, 400), np.linspace(0, np.pi, 400))
-    axes[0].contour(T2, T1, 2 * np.cos(T1) + np.cos(T2), levels=[1], colors="w", linestyles="--", linewidths=1)
-    axes[0].set_title("Flip number (dashed: energy bound)")
-
     th1, th2, lam = load_grid(DATA / "grids" / "lyapunov.txt")
-    im = axes[1].pcolormesh(th2, th1, lam, cmap="viridis", shading="auto")
-    fig.colorbar(im, ax=axes[1], label=r"$\lambda_{max}$ [s$^{-1}$]")
-    axes[1].set_title("Largest Lyapunov exponent")
+    im = axes[0].pcolormesh(th2, th1, lam, cmap="viridis", shading="auto")
+    fig.colorbar(im, ax=axes[0], label=r"$\lambda_{max}$ [s$^{-1}$]")
+    axes[0].set_title("Largest Lyapunov exponent")
+
+    th1, th2, flips = load_grid(DATA / "grids" / "flip_number.txt")
+    im = axes[1].pcolormesh(th2, th1, flips, cmap="magma", shading="auto")
+    fig.colorbar(im, ax=axes[1], label="number of flips")
+    axes[1].set_title(r"Number of flips, $t_{max}=50$ s")
 
     for ax in axes:
-        ax.set(xlabel=r"$\theta_2(0)$", ylabel=r"$\theta_1(0)$", aspect="equal")
+        ax.set(xlabel=r"$\theta_{2,0}$", ylabel=r"$\theta_{1,0}$", aspect="equal")
         ax.set_xticks(ticks, labels)
         ax.set_yticks(ticks, labels)
     fig.tight_layout()
